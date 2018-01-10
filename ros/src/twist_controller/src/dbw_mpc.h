@@ -1,16 +1,16 @@
 #include <ros/ros.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <std_msgs/Bool>
-#include <dbw_mkz_msgs/ThrottleCmd>
-#include <dbw_mkz_msgs/BrakeCmd>
-#include <dbw_mkz_msgs/SteeringCmd>
+#include <std_msgs/Header.h>
+#include <dbw_mkz_msgs/ThrottleCmd.h>
+#include <dbw_mkz_msgs/BrakeCmd.h>
+#include <dbw_mkz_msgs/SteeringCmd.h>
 
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
 
-#include "styx_msgs/Lane"
+#include "styx_msgs/Lane.h"
 
 double polyeval(Eigen::VectorXd coeffs, double x) {
     double result = 0.0;
@@ -45,15 +45,16 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
 }
 
 
-class DbwMpc: enabled(false)
+class DbwMpc
  {
     bool enabled;
     styx_msgs::Lane waypoints;
     geometry_msgs::PoseStamped pose;
-    Mpc mpc;
+    geometry_msgs::TwistStamped velocity;
+    MPC mpc;
 
-
-    DbwMpc() {
+public:
+    DbwMpc() : enabled(false) {
 
     }
 
@@ -78,12 +79,12 @@ class DbwMpc: enabled(false)
         while (ros::ok()) {
             ros::spinOnce();
             if (enabled && velocity && waypoints && pose) {
-                mpc.calculate();
+                calculate();
             }
             if (enabled) {
-                steering_publisher.publish();
-                throttle_publisher.publish();
-                brake_publisher.publish();
+//                steering_publisher.publish();
+//                throttle_publisher.publish();
+//                brake_publisher.publish();
             }
             loop_rate.sleep();
         }
@@ -147,7 +148,7 @@ class DbwMpc: enabled(false)
     }
 
     void onVelocity(const geometry_msgs::TwistStampedConstPtr newVelocity) {
-        velocity = newVelocity;
+        velocity = *newVelocity;
     }
 
     void onTwist(const geometry_msgs::TwistStamped& twist) {
@@ -157,10 +158,3 @@ class DbwMpc: enabled(false)
 };
 
 
-int main(int argc, char **argv) {
-    ros::init(argc, argv, "dbw_mpc");
-
-    DbwMpc mpc;
-    mpc.run();
-
-}
