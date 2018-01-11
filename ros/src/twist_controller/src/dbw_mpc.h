@@ -1,7 +1,7 @@
 #include <ros/ros.h>
 #include <geometry_msgs/TwistStamped.h>
 #include <geometry_msgs/PoseStamped.h>
-#include <std_msgs/Header.h>
+#include <std_msgs/Bool.h>
 #include <dbw_mkz_msgs/ThrottleCmd.h>
 #include <dbw_mkz_msgs/BrakeCmd.h>
 #include <dbw_mkz_msgs/SteeringCmd.h>
@@ -50,6 +50,10 @@ double Lf = 2.67;
 
 class DbwMpc
  {
+    bool waypoint_set;
+    bool velocity_set;
+    bool pose_set;
+
     bool enabled;
     styx_msgs::Lane waypoints;
     geometry_msgs::PoseStamped pose;
@@ -57,7 +61,7 @@ class DbwMpc
     MPC mpc;
 
     double steer_value;
-    double throttle_value
+    double throttle_value;
 
 public:
     DbwMpc() : enabled(false) {
@@ -74,17 +78,17 @@ public:
         ros::Publisher throttle_publisher = nh.advertise<geometry_msgs::TwistStamped>("/vehicle/throttle_cmd", 1);
         ros::Publisher brake_publisher = nh.advertise<geometry_msgs::TwistStamped>("/vehicle/brake_cmd", 1);
 
-        ros::Subscriber enabled_subscriber = nh.subscribe("/vehicle/dbw_enabled", 1, &DbwMpc::onEnabled, &mpc);
-        ros::Subscriber waypoint_subscriber = nh.subscribe("/final_waypoints", 1, &DbwMpc::onWaypoints, &mpc);
-        ros::Subscriber pose_subscriber = nh.subscribe("/current_pose", 1, &DbwMpc::onPose, &mpc);
-        ros::Subscriber velocity_subscriber = nh.subscribe("/current_velocity", 1, &DbwMpc::onVelocity, &mpc);
-        ros::Subscriber twist_subscriber = nh.subscribe("/twist_cmd", 1, &DbwMpc::onTwist, &mpc);
+        ros::Subscriber enabled_subscriber = nh.subscribe("/vehicle/dbw_enabled", 1, &DbwMpc::onEnabled, this);
+        ros::Subscriber waypoint_subscriber = nh.subscribe("/final_waypoints", 1, &DbwMpc::onWaypoints, this);
+        ros::Subscriber pose_subscriber = nh.subscribe("/current_pose", 1, &DbwMpc::onPose, this);
+        ros::Subscriber velocity_subscriber = nh.subscribe("/current_velocity", 1, &DbwMpc::onVelocity, this);
+        ros::Subscriber twist_subscriber = nh.subscribe("/twist_cmd", 1, &DbwMpc::onTwist, this);
 
         ros::Rate loop_rate(10);
 
         while (ros::ok()) {
             ros::spinOnce();
-            if (enabled && velocity && waypoints && pose) {
+            if (enabled && velocity_set && waypoint_set && pose_set) {
                 calculate();
             }
             if (enabled) {
@@ -99,20 +103,21 @@ public:
     void calculate() {
         vector<double> ptsx;
         vector<double> ptsy;
-        double psi = pose.pose.orientation.x; // ???
+        double psi = pose.pose.orientation.z;
         
-        for (int i=0; waypoints.waypoints.size(); i++) {
+        for (size_t i=0; waypoints.waypoints.size(); i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
         }
 
         double px = pose.pose.position.x;
         double py = pose.pose.position.y;
+        double v = velocity.twist.linear.x;
 
         vector<double> xs;
         vector<double> ys;
 
-        for (int i = 0; i < ptsx.size(); i++) {
+        for (size_t i = 0; i < ptsx.size(); i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
             xs.push_back(dx * cos(-psi) - dy * sin(-psi));
@@ -145,22 +150,25 @@ public:
     }
 
     void onEnabled(const std_msgs::BoolConstPtr isEnabled) {
-        enabled = isEnabled.data;
+        enabled = isEnabled->data;
     }
 
     void onWaypoints(const styx_msgs::LaneConstPtr newWaypoints) {
         waypoints = *newWaypoints;
+        waypoint_set = true;
     }
 
     void onPose(const geometry_msgs::PoseStampedConstPtr newPose) {
-        pose = newPose->pose;
+        pose = *newPose;
+        pose_set = true;
     }
 
     void onVelocity(const geometry_msgs::TwistStampedConstPtr newVelocity) {
         velocity = *newVelocity;
+        velocity_set = true;
     }
 
-    void onTwist(const geometry_msgs::TwistStamped& twist) {
+    void onTwist(const geometry_msgs::TwistStampedConstPtr twist) {
 
     }
 
