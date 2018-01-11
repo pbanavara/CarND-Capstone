@@ -44,6 +44,9 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
     return result;
 }
 
+double latency = 0.1;
+double Lf = 2.67;
+
 
 class DbwMpc
  {
@@ -52,6 +55,9 @@ class DbwMpc
     geometry_msgs::PoseStamped pose;
     geometry_msgs::TwistStamped velocity;
     MPC mpc;
+
+    double steer_value;
+    double throttle_value
 
 public:
     DbwMpc() : enabled(false) {
@@ -93,12 +99,15 @@ public:
     void calculate() {
         vector<double> ptsx;
         vector<double> ptsy;
-        double psi = current_pose.xxx;
+        double psi = pose.pose.orientation.x; // ???
         
         for (int i=0; waypoints.waypoints.size(); i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
         }
+
+        double px = pose.pose.position.x;
+        double py = pose.pose.position.y;
 
         vector<double> xs;
         vector<double> ys;
@@ -136,7 +145,7 @@ public:
     }
 
     void onEnabled(const std_msgs::BoolConstPtr isEnabled) {
-        enabled = isEnabled->data;
+        enabled = isEnabled.data;
     }
 
     void onWaypoints(const styx_msgs::LaneConstPtr newWaypoints) {
@@ -144,7 +153,7 @@ public:
     }
 
     void onPose(const geometry_msgs::PoseStampedConstPtr newPose) {
-        pose = *newPose->pose;
+        pose = newPose->pose;
     }
 
     void onVelocity(const geometry_msgs::TwistStampedConstPtr newVelocity) {
@@ -158,3 +167,72 @@ public:
 };
 
 
+/**
+
+geometry_msgs/TwistStamped
+std_msgs/Header header
+  uint32 seq
+  time stamp
+  string frame_id
+geometry_msgs/Twist twist
+  geometry_msgs/Vector3 linear
+    float64 x
+    float64 y
+    float64 z
+  geometry_msgs/Vector3 angular
+    float64 x
+    float64 y
+    float64 z
+
+geometry_msgs/PoseStamped
+std_msgs/Header header
+  uint32 seq
+  time stamp
+  string frame_id
+geometry_msgs/Pose pose
+  geometry_msgs/Point position
+    float64 x
+    float64 y
+    float64 z
+  geometry_msgs/Quaternion orientation
+    float64 x
+    float64 y
+    float64 z
+    float64 w
+
+dbw_mkz_msgs/ThrottleCmd
+uint8 CMD_NONE=0
+uint8 CMD_PEDAL=1
+uint8 CMD_PERCENT=2
+float32 pedal_cmd
+uint8 pedal_cmd_type
+bool enable
+bool clear
+bool ignore
+uint8 count
+
+dbw_mkz_msgs/BrakeCmd
+uint8 CMD_NONE=0
+uint8 CMD_PEDAL=1
+uint8 CMD_PERCENT=2
+uint8 CMD_TORQUE=3
+float32 TORQUE_BOO=520
+float32 TORQUE_MAX=3412
+float32 pedal_cmd
+uint8 pedal_cmd_type
+bool boo_cmd
+bool enable
+bool clear
+bool ignore
+uint8 count
+
+dbw_mkz_msgs/SteeringCmd
+float32 steering_wheel_angle_cmd
+float32 steering_wheel_angle_velocity
+bool enable
+bool clear
+bool ignore
+bool quiet
+uint8 count
+
+*/
