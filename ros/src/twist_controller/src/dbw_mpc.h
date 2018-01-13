@@ -48,58 +48,72 @@ class DbwMpc
     bool waypoint_set;
     bool velocity_set;
     bool pose_set;
-
     bool enabled;
+    double steer_value;
+    double throttle_value;
+
     styx_msgs::Lane waypoints;
     geometry_msgs::PoseStamped pose;
     geometry_msgs::TwistStamped velocity;
     MPC mpc;
 
-    double steer_value;
-    double throttle_value;
-
 public:
-    DbwMpc() : enabled(false) {
-
-    }
+    DbwMpc() :
+        waypoint_set(false),
+        velocity_set(false),
+        pose_set(false),
+        enabled(false),
+        steer_value(0),
+        throttle_value(0)
+    { }
 
     void run() {
         ros::NodeHandle nh;
 
-        double vehicle_mass;
-        nh.param<double>("~vehicle_mass", vehicle_mass, 1736.35);
+        ROS_INFO("getting parameters");
 
-        ros::Publisher steering_publisher = nh.advertise<geometry_msgs::TwistStamped>("/vehicle/steering_cmd", 1);
-        ros::Publisher throttle_publisher = nh.advertise<geometry_msgs::TwistStamped>("/vehicle/throttle_cmd", 1);
-        ros::Publisher brake_publisher = nh.advertise<geometry_msgs::TwistStamped>("/vehicle/brake_cmd", 1);
+//        double vehicle_mass;
+//        nh.param<double>("~vehicle_mass", vehicle_mass, 1736.35);
+        // TODO the rest
 
+        ROS_INFO("setting up publishers");
+        ros::Publisher steering_publisher = nh.advertise<dbw_mkz_msgs::SteeringCmd>("/vehicle/steering_cmd", 1);
+        ros::Publisher throttle_publisher = nh.advertise<dbw_mkz_msgs::ThrottleCmd>("/vehicle/throttle_cmd", 1);
+        ros::Publisher brake_publisher = nh.advertise<dbw_mkz_msgs::BrakeCmd>("/vehicle/brake_cmd", 1);
+
+        ROS_INFO("setting up subscribers");
         ros::Subscriber enabled_subscriber = nh.subscribe("/vehicle/dbw_enabled", 1, &DbwMpc::onEnabled, this);
         ros::Subscriber waypoint_subscriber = nh.subscribe("/final_waypoints", 1, &DbwMpc::onWaypoints, this);
         ros::Subscriber pose_subscriber = nh.subscribe("/current_pose", 1, &DbwMpc::onPose, this);
         ros::Subscriber velocity_subscriber = nh.subscribe("/current_velocity", 1, &DbwMpc::onVelocity, this);
 
-        ros::Rate loop_rate(50);
+        ros::Rate loop_rate(10); // TODO 50
 
+        ROS_INFO("starting loop");
         while (ros::ok()) {
             ros::spinOnce();
-            if (enabled && velocity_set && waypoint_set && pose_set) {
-                dbw_mkz_msgs::SteeringCmd steerCmd;
-                steerCmd.enable = true;
-                steerCmd.steering_wheel_angle_cmd = steer_value;
-                steering_publisher.publish(steerCmd);
+            if (velocity_set && waypoint_set && pose_set) {
+                calculate();
 
-                if (throttle_value>0) {
-                    dbw_mkz_msgs::ThrottleCmd throttle_cmd;
-                    throttle_cmd.enable = true;
-                    throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
-                    throttle_cmd.pedal_cmd = throttle_value;
-                    throttle_publisher.publish(throttle_cmd);
-                } else {
-                    dbw_mkz_msgs::BrakeCmd brake_cmd;
-                    brake_cmd.enable = true;
-                    brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_TORQUE;
-                    brake_cmd.pedal_cmd = throttle_value;
-                    brake_publisher.publish(brake_cmd);
+                if (enabled) {
+                    dbw_mkz_msgs::SteeringCmd steerCmd;
+                    steerCmd.enable = true;
+                    steerCmd.steering_wheel_angle_cmd = steer_value;
+                    steering_publisher.publish(steerCmd);
+
+                    if (throttle_value > 0) {
+                        dbw_mkz_msgs::ThrottleCmd throttle_cmd;
+                        throttle_cmd.enable = true;
+                        throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
+                        throttle_cmd.pedal_cmd = throttle_value;
+                        throttle_publisher.publish(throttle_cmd);
+                    } else {
+                        dbw_mkz_msgs::BrakeCmd brake_cmd;
+                        brake_cmd.enable = true;
+                        brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_TORQUE;
+                        brake_cmd.pedal_cmd = throttle_value;
+                        brake_publisher.publish(brake_cmd);
+                    }
                 }
             }
             loop_rate.sleep();
@@ -109,9 +123,9 @@ public:
     void calculate() {
         vector<double> ptsx;
         vector<double> ptsy;
-        double psi = pose.pose.orientation.z;
-
-        for (size_t i=0; waypoints.waypoints.size(); i++) {
+        size_t numWaypoints = waypoints.waypoints.size();
+        numWaypoints = 10;
+        for (size_t i=0; i < numWaypoints; i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
         }
@@ -120,42 +134,55 @@ public:
         double py = pose.pose.position.y;
         double v = velocity.twist.linear.x;
 
+        double siny = 2. * (pose.pose.orientation.w * pose.pose.orientation.z + pose.pose.orientation.x * pose.pose.orientation.y);
+        double cosy = 1. - 2. * (pose.pose.orientation.y * pose.pose.orientation.y + pose.pose.orientation.z * pose.pose.orientation.z);
+        double psi = atan2(siny, cosy);
+
         vector<double> xs;
         vector<double> ys;
-
         for (size_t i = 0; i < ptsx.size(); i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
-            xs.push_back(dx * cos(-psi) - dy * sin(-psi));
-            ys.push_back(dx * sin(-psi) + dy * cos(-psi));
+            double x = dx * cos(-psi) - dy * sin(-psi);
+            double y = dx * sin(-psi) + dy * cos(-psi);
+            xs.push_back(x);
+            ys.push_back(y);
         }
 
         double *ptrx = &xs[0];
         double *ptry = &ys[0];
-        Eigen::Map<Eigen::VectorXd> waypoints_x_eig(ptrx, 6);
-        Eigen::Map<Eigen::VectorXd> waypoints_y_eig(ptry, 6);
+        Eigen::Map<Eigen::VectorXd> waypoints_x_eig(ptrx, numWaypoints);
+        Eigen::Map<Eigen::VectorXd> waypoints_y_eig(ptry, numWaypoints);
 
         auto coeffs = polyfit(waypoints_x_eig, waypoints_y_eig, 3);
+//        ROS_INFO_STREAM("coeffs=" << coeffs);
+
         double cte = polyeval(coeffs, 0);  // px = 0, py = 0
         double epsi = -atan(coeffs[1]);  // p
 
         double delta = -steer_value;
         psi = delta;
-        px = v * cos(psi) * latency;
-        py = v * sin(psi) * latency;
-        cte += v * sin(epsi) * latency;
-        epsi += v * delta * latency / Lf;
-        psi += v * delta * latency / Lf;
-        v += throttle_value * latency;
+        // TODO predict for latency
+//        px = v * cos(psi) * latency;
+//        py = v * sin(psi) * latency;
+//        cte += v * sin(epsi) * latency;
+//        epsi += v * delta * latency / Lf;
+//        psi += v * delta * latency / Lf;
+//        v += throttle_value * latency;
 
         Eigen::VectorXd state(6);
         state << px, py, psi, v, cte, epsi;
+        ROS_INFO_STREAM("px, py, psi, v, cte, epsi" << state);
+
         auto vars = mpc.Solve(state, coeffs);
         steer_value = vars[0];
         throttle_value = vars[1];
+
+        ROS_INFO_STREAM("steer=" << steer_value << " throttle=" << throttle_value);
     }
 
     void onEnabled(const std_msgs::BoolConstPtr isEnabled) {
+        ROS_INFO("onEnabled");
         enabled = isEnabled->data;
     }
 
