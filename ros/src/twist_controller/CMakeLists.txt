@@ -126,7 +126,6 @@ catkin_package(
 # include_directories(include)
 include_directories(
   ${catkin_INCLUDE_DIRS}
-  ../waypoint_follower/include
 )
 
 ## Declare a C++ library
@@ -209,4 +208,4 @@ include_directories(
 
 SET(CMAKE_CXX_FLAGS "-std=c++11 -O2 -g -Wall ${CMAKE_CXX_FLAGS}")
 add_executable(dbw_mpc src/dbw_mpc.cpp src/MPC.cpp)
-target_link_libraries(dbw_mpc ipopt libwaypoint_follower ${catkin_LIBRARIES})
+target_link_libraries(dbw_mpc ipopt ${catkin_LIBRARIES})

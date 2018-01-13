@@ -9,9 +9,10 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
-#include "libwaypoint_follower.h"
-
 #include "styx_msgs/Lane.h"
+
+double latency = 0.1;
+double Lf = 2.67;
 
 double polyeval(Eigen::VectorXd coeffs, double x) {
     double result = 0.0;
@@ -21,9 +22,6 @@ double polyeval(Eigen::VectorXd coeffs, double x) {
     return result;
 }
 
-// Fit a polynomial.
-// Adapted from
-// https://github.com/JuliaMath/Polynomials.jl/blob/master/src/Polynomials.jl#L676-L716
 Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
                         int order) {
     assert(xvals.size() == yvals.size());
@@ -44,10 +42,6 @@ Eigen::VectorXd polyfit(Eigen::VectorXd xvals, Eigen::VectorXd yvals,
     auto result = Q.solve(yvals);
     return result;
 }
-
-double latency = 0.1;
-double Lf = 2.67;
-
 
 class DbwMpc
 {
@@ -89,7 +83,6 @@ public:
         while (ros::ok()) {
             ros::spinOnce();
             if (enabled && velocity_set && waypoint_set && pose_set) {
-
                 dbw_mkz_msgs::SteeringCmd steerCmd;
                 steerCmd.enable = true;
                 steerCmd.steering_wheel_angle_cmd = steer_value;
@@ -118,9 +111,7 @@ public:
         vector<double> ptsy;
         double psi = pose.pose.orientation.z;
 
-        size_t closestWaypointIdx = getClosestWaypoint(waypoints, pose.pose);
-
-        for (size_t i=closestWaypointIdx; i < closestWaypointIdx+3; i++) {
+        for (size_t i=0; waypoints.waypoints.size(); i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
         }
