@@ -9,6 +9,7 @@
 #include "Eigen-3.3/Eigen/Core"
 #include "Eigen-3.3/Eigen/QR"
 #include "MPC.h"
+#include "libwaypoint_follower.h"
 
 #include "styx_msgs/Lane.h"
 
@@ -49,7 +50,7 @@ double Lf = 2.67;
 
 
 class DbwMpc
- {
+{
     bool waypoint_set;
     bool velocity_set;
     bool pose_set;
@@ -82,19 +83,31 @@ public:
         ros::Subscriber waypoint_subscriber = nh.subscribe("/final_waypoints", 1, &DbwMpc::onWaypoints, this);
         ros::Subscriber pose_subscriber = nh.subscribe("/current_pose", 1, &DbwMpc::onPose, this);
         ros::Subscriber velocity_subscriber = nh.subscribe("/current_velocity", 1, &DbwMpc::onVelocity, this);
-        ros::Subscriber twist_subscriber = nh.subscribe("/twist_cmd", 1, &DbwMpc::onTwist, this);
 
-        ros::Rate loop_rate(10);
+        ros::Rate loop_rate(50);
 
         while (ros::ok()) {
             ros::spinOnce();
             if (enabled && velocity_set && waypoint_set && pose_set) {
-                calculate();
-            }
-            if (enabled) {
-//                steering_publisher.publish();
-//                throttle_publisher.publish();
-//                brake_publisher.publish();
+
+                dbw_mkz_msgs::SteeringCmd steerCmd;
+                steerCmd.enable = true;
+                steerCmd.steering_wheel_angle_cmd = steer_value;
+                steering_publisher.publish(steerCmd);
+
+                if (throttle_value>0) {
+                    dbw_mkz_msgs::ThrottleCmd throttle_cmd;
+                    throttle_cmd.enable = true;
+                    throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
+                    throttle_cmd.pedal_cmd = throttle_value;
+                    throttle_publisher.publish(throttle_cmd);
+                } else {
+                    dbw_mkz_msgs::BrakeCmd brake_cmd;
+                    brake_cmd.enable = true;
+                    brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_TORQUE;
+                    brake_cmd.pedal_cmd = throttle_value;
+                    brake_publisher.publish(brake_cmd);
+                }
             }
             loop_rate.sleep();
         }
@@ -104,8 +117,10 @@ public:
         vector<double> ptsx;
         vector<double> ptsy;
         double psi = pose.pose.orientation.z;
-        
-        for (size_t i=0; waypoints.waypoints.size(); i++) {
+
+        size_t closestWaypointIdx = getClosestWaypoint(waypoints, pose.pose);
+
+        for (size_t i=closestWaypointIdx; i < closestWaypointIdx+3; i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
         }
@@ -168,10 +183,6 @@ public:
         velocity_set = true;
     }
 
-    void onTwist(const geometry_msgs::TwistStampedConstPtr twist) {
-
-    }
-
 };
 
 
@@ -207,6 +218,13 @@ geometry_msgs/Pose pose
     float64 y
     float64 z
     float64 w
+
+Lane
+    Header header
+    Waypoint[] waypoints
+Waypoint
+    geometry_msgs/PoseStamped pose
+    geometry_msgs/TwistStamped twist
 
 dbw_mkz_msgs/ThrottleCmd
 uint8 CMD_NONE=0
