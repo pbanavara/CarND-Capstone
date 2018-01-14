@@ -7,7 +7,7 @@
 using CppAD::AD;
 
 // TODO: Set the timestep length and duration
-size_t N = 10;
+size_t N = 20;
 double dt = 0.1;
 
 // This value assumes the model presented in the classroom is used.
@@ -22,7 +22,7 @@ double dt = 0.1;
 // This is the length from front to CoG that has a similar radius.
 const double Lf = 2.67;
 
-double ref_v = 5;
+
 size_t x_start = 0;
 size_t y_start = x_start + N;
 size_t psi_start = y_start + N;
@@ -36,8 +36,9 @@ class FG_eval {
 public:
     // Fitted polynomial coefficients
     Eigen::VectorXd coeffs;
+    double ref_v;
 
-    FG_eval(Eigen::VectorXd coeffs) { this->coeffs = coeffs; }
+    FG_eval(Eigen::VectorXd coeffs, double v) { this->coeffs = coeffs; this->ref_v = v; }
 
     typedef CPPAD_TESTVECTOR(AD<double>) ADvector;
 
@@ -52,19 +53,18 @@ public:
         // TODO: Define the cost related the reference state and
         // any anything you think may be beneficial.
         for (size_t i = 0; i < N; i++) {
-            fg[0] += 1 * CppAD::pow(vars[cte_start + i], 2);
-            fg[0] += 1 * CppAD::pow(vars[epsi_start + i], 2);
-            fg[0] += 100 * CppAD::pow(vars[v_start + i] - ref_v, 2);
+            fg[0] += 10 * CppAD::pow(vars[cte_start + i], 2);
+            fg[0] += 10 * CppAD::pow(vars[epsi_start + i], 2);
+            fg[0] += 1 * CppAD::pow(vars[v_start + i] - ref_v, 2);
         }
 
         for (size_t i = 0; i < N - 1; i++) {
-//            fg[0] += 1 * CppAD::pow(vars[delta_start + i], 2);
- //           fg[0] += 1 * CppAD::pow(vars[a_start + i], 2);
+            fg[0] += 5000 * CppAD::pow(vars[delta_start + i], 2);
+            fg[0] += 10 * CppAD::pow(vars[a_start + i], 2);
         }
         for (size_t t = 0; t < N - 2; t++) {
-//            fg[0] += 5000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-//            fg[0] += 1 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
-//            fg[0] += 1 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
+            fg[0] += 5000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+            fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
         }
 
         //
@@ -128,7 +128,7 @@ MPC::MPC() {}
 
 MPC::~MPC() {}
 
-vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
+vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs, double target_v) {
     bool ok = true;
     typedef CPPAD_TESTVECTOR(double) Dvector;
 
@@ -204,7 +204,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     constraints_upperbound[epsi_start] = epsi;
 
     // object that computes objective and constraints
-    FG_eval fg_eval(coeffs);
+    FG_eval fg_eval(coeffs, target_v);
 
     //
     // NOTE: You don't have to worry about these options
@@ -222,7 +222,7 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs) {
     options += "Sparse  true        reverse\n";
     // NOTE: Currently the solver has a maximum time limit of 0.5 seconds.
     // Change this as you see fit.
-    options += "Numeric max_cpu_time          0.5\n";
+    options += "Numeric max_cpu_time          0.02\n";
 
     // place to return solution
     CppAD::ipopt::solve_result<Dvector> solution;

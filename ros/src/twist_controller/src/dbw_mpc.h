@@ -87,7 +87,7 @@ public:
         ros::Subscriber pose_subscriber = nh.subscribe("/current_pose", 1, &DbwMpc::onPose, this);
         ros::Subscriber velocity_subscriber = nh.subscribe("/current_velocity", 1, &DbwMpc::onVelocity, this);
 
-        ros::Rate loop_rate(10); // TODO 50
+        ros::Rate loop_rate(50);
 
         ROS_INFO("starting loop");
         while (ros::ok()) {
@@ -98,7 +98,7 @@ public:
                 if (enabled) {
                     dbw_mkz_msgs::SteeringCmd steerCmd;
                     steerCmd.enable = true;
-                    steerCmd.steering_wheel_angle_cmd = steer_value;
+                    steerCmd.steering_wheel_angle_cmd = -steer_value * 10;
                     steering_publisher.publish(steerCmd);
 
                     if (throttle_value > 0) {
@@ -124,7 +124,6 @@ public:
         vector<double> ptsx;
         vector<double> ptsy;
         size_t numWaypoints = waypoints.waypoints.size();
-//        numWaypoints = 10;
         for (size_t i=0; i < numWaypoints; i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
@@ -140,11 +139,12 @@ public:
 
         vector<double> xs;
         vector<double> ys;
-        for (size_t i = 0; i < numWaypoints; i++) {
+        for (size_t i = 0; i < ptsx.size(); i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
             double x = dx * cos(-psi) - dy * sin(-psi);
             double y = dx * sin(-psi) + dy * cos(-psi);
+//            ROS_INFO_STREAM(i << " " <<x << ":"<<y);
             xs.push_back(x);
             ys.push_back(y);
         }
@@ -160,26 +160,28 @@ public:
         double cte = polyeval(coeffs, 0);  // px = 0, py = 0
         double epsi = -atan(coeffs[1]);  // p
 
-        ROS_INFO("psi, v, cte, epsi, steer_value= %f %f %f %f %f", psi, v, cte, epsi, steer_value);
+//        ROS_INFO("xy= %f : %f psi=%f v=%f cte=%f epsi=%f steer=%f", px, py, psi, v, cte, epsi, steer_value);
 
-//        double delta = -steer_value;
-//        psi = delta;
         psi = 0;
+        psi = steer_value;
         // TODO predict for latency
+        px = 0;
+        py = 0;
 //        px = v * cos(psi) * latency;
 //        py = v * sin(psi) * latency;
 //        cte += v * sin(epsi) * latency;
-//        epsi += v * delta * latency / Lf;
-//        psi += v * delta * latency / Lf;
+//        epsi += v * steer_value * latency / Lf;
+//        psi += v * steer_value * latency / Lf;
 //        v += throttle_value * latency;
 
         Eigen::VectorXd state(6);
         state << px, py, psi, v, cte, epsi;
 
-        auto vars = mpc.Solve(state, coeffs);
+        double target_speed = waypoints.waypoints[0].twist.twist.linear.x;
+
+        auto vars = mpc.Solve(state, coeffs, target_speed);
         steer_value = vars[0];
         throttle_value = vars[1];
-
         ROS_INFO_STREAM("steer=" << steer_value << " throttle=" << throttle_value);
     }
 
