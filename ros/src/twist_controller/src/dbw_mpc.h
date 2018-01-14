@@ -124,7 +124,7 @@ public:
         vector<double> ptsx;
         vector<double> ptsy;
         size_t numWaypoints = waypoints.waypoints.size();
-        numWaypoints = 10;
+//        numWaypoints = 10;
         for (size_t i=0; i < numWaypoints; i++) {
             ptsx.push_back(waypoints.waypoints[i].pose.pose.position.x);
             ptsy.push_back(waypoints.waypoints[i].pose.pose.position.y);
@@ -140,7 +140,7 @@ public:
 
         vector<double> xs;
         vector<double> ys;
-        for (size_t i = 0; i < ptsx.size(); i++) {
+        for (size_t i = 0; i < numWaypoints; i++) {
             double dx = ptsx[i] - px;
             double dy = ptsy[i] - py;
             double x = dx * cos(-psi) - dy * sin(-psi);
@@ -160,8 +160,11 @@ public:
         double cte = polyeval(coeffs, 0);  // px = 0, py = 0
         double epsi = -atan(coeffs[1]);  // p
 
-        double delta = -steer_value;
-        psi = delta;
+        ROS_INFO("psi, v, cte, epsi, steer_value= %f %f %f %f %f", psi, v, cte, epsi, steer_value);
+
+//        double delta = -steer_value;
+//        psi = delta;
+        psi = 0;
         // TODO predict for latency
 //        px = v * cos(psi) * latency;
 //        py = v * sin(psi) * latency;
@@ -172,7 +175,6 @@ public:
 
         Eigen::VectorXd state(6);
         state << px, py, psi, v, cte, epsi;
-        ROS_INFO_STREAM("px, py, psi, v, cte, epsi" << state);
 
         auto vars = mpc.Solve(state, coeffs);
         steer_value = vars[0];
