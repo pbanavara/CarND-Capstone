@@ -49,6 +49,8 @@ class DbwMpc
     bool velocity_set;
     bool pose_set;
     bool enabled;
+    double brake_deadband;
+    double decel_limit;
     double steer_value;
     double throttle_value;
 
@@ -69,12 +71,28 @@ public:
 
     void run() {
         ros::NodeHandle nh;
+        ros::NodeHandle nhp("~");
 
         ROS_INFO("getting parameters");
 
-//        double vehicle_mass;
-//        nh.param<double>("~vehicle_mass", vehicle_mass, 1736.35);
-        // TODO the rest
+        double steer_ratio;
+        nhp.param<double>("steer_ratio", steer_ratio, 14.8);
+        double vehicle_mass;
+        nhp.param<double>("vehicle_mass", vehicle_mass, 1736.35);
+        double wheel_base;
+        nhp.param<double>("wheel_base", wheel_base, 2.8498);
+        double wheel_radius;
+        nhp.param<double>("wheel_radius", wheel_radius, 0.2413);
+        nhp.param<double>("decel_limit", decel_limit, -5.);
+        double accel_limit;
+        nhp.param<double>("accel_limit", accel_limit, 1.);
+        nhp.param<double>("brake_deadband", brake_deadband, .1);
+        double max_lat_accel;
+        nhp.param<double>("max_lat_accel", max_lat_accel, 3.);
+        double max_steer_angle;
+        nhp.param<double>("max_steer_angle", max_steer_angle, 8.);
+
+        MPC mpc(accel_limit, decel_limit);
 
         ROS_INFO("setting up publishers");
         ros::Publisher steering_publisher = nh.advertise<dbw_mkz_msgs::SteeringCmd>("/vehicle/steering_cmd", 1);
@@ -93,25 +111,25 @@ public:
         while (ros::ok()) {
             ros::spinOnce();
             if (velocity_set && waypoint_set && pose_set) {
-                calculate();
+                calculate(brake_deadband);
 
                 if (enabled) {
                     dbw_mkz_msgs::SteeringCmd steerCmd;
                     steerCmd.enable = true;
-                    steerCmd.steering_wheel_angle_cmd = -steer_value * 10;
+                    steerCmd.steering_wheel_angle_cmd = -steer_value * steer_ratio;
                     steering_publisher.publish(steerCmd);
 
                     if (throttle_value > 0) {
                         dbw_mkz_msgs::ThrottleCmd throttle_cmd;
                         throttle_cmd.enable = true;
                         throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
-                        throttle_cmd.pedal_cmd = throttle_value;
+                        throttle_cmd.pedal_cmd = throttle_value / accel_limit;
                         throttle_publisher.publish(throttle_cmd);
                     } else {
                         dbw_mkz_msgs::BrakeCmd brake_cmd;
                         brake_cmd.enable = true;
-                        brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_TORQUE;
-                        brake_cmd.pedal_cmd = throttle_value;
+                        brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_PERCENT;
+                        brake_cmd.pedal_cmd = throttle_value / decel_limit;
                         brake_publisher.publish(brake_cmd);
                     }
                 }
@@ -182,6 +200,9 @@ public:
         auto vars = mpc.Solve(state, coeffs, target_speed);
         steer_value = vars[0];
         throttle_value = vars[1];
+        if (target_speed < .1 && throttle_value < 0 && throttle_value > -brake_deadband) {
+            throttle_value = -decel_limit;
+        }
         ROS_INFO_STREAM("steer=" << steer_value << " throttle=" << throttle_value);
     }
 

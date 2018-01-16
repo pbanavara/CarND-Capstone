@@ -124,7 +124,9 @@ public:
 //
 // MPC class definition implementation.
 //
-MPC::MPC() {}
+MPC::MPC(double accel_limit, double decel_limit) :
+ accel_limit(accel_limit),
+ decel_limit(decel_limit) {}
 
 MPC::~MPC() {}
 
@@ -178,8 +180,8 @@ vector<double> MPC::Solve(Eigen::VectorXd state, Eigen::VectorXd coeffs, double 
     // Acceleration/decceleration upper and lower limits.
     // NOTE: Feel free to change this to something else.
     for (size_t i = a_start; i < n_vars; i++) {
-        vars_lowerbound[i] = -1.0;
-        vars_upperbound[i] = 1.0;
+        vars_lowerbound[i] = decel_limit;
+        vars_upperbound[i] = accel_limit;
     }
 
     // Lower and upper limits for the constraints

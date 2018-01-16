@@ -7,8 +7,11 @@
 using namespace std;
 
 class MPC {
+ double accel_limit;
+ double decel_limit;
+
  public:
-  MPC();
+  MPC(double accel_limit, double decel_limit);
 
   virtual ~MPC();
 
