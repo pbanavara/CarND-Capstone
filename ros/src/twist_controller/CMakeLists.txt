@@ -112,6 +112,11 @@ catkin_package(
 #  DEPENDS system_lib
 )
 
+catkin_package(
+  CATKIN_DEPENDS roscpp std_msgs geometry_msgs styx_msgs dbw_mkz_msgs
+)
+
+
 ###########
 ## Build ##
 ###########
@@ -200,3 +205,7 @@ include_directories(
 
 ## Add folders to be run by python nosetests
 # catkin_add_nosetests(test)
+
+SET(CMAKE_CXX_FLAGS "-std=c++11 -O2 -g -Wall ${CMAKE_CXX_FLAGS}")
+add_executable(dbw_mpc src/dbw_mpc.cpp src/MPC.cpp)
+target_link_libraries(dbw_mpc ipopt ${catkin_LIBRARIES})
