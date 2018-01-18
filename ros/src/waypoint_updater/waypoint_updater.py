@@ -225,10 +225,6 @@ class WaypointUpdater(object):
                 velocity = self.decelerate(car_index + i)
                 waypoint.twist.twist.linear.x = velocity
                 rospy.loginfo("info: velocity - {}".format(velocity))
-#	    else:
-#		for i, waypoint in enumerate(ahead_waypoints):
-#                    waypoint.twist.twist.linear.x = self.initial_velocity
-#                    rospy.loginfo("info: velocity - {}".format(self.initial_velocity))
         else:
             for i, waypoint in enumerate(ahead_waypoints):
                 waypoint.twist.twist.linear.x = self.initial_velocity
