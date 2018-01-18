@@ -76,7 +76,7 @@ class WaypointUpdater(object):
         '''
         self.saved_base_waypoints = msg.waypoints
         self.num_waypoints = len(msg.waypoints)
-	    self.initial_velocity = self.saved_base_waypoints[0].twist.twist.linear.x
+        self.initial_velocity = self.saved_base_waypoints[0].twist.twist.linear.x
 
 
     def pose_cb(self, msg):
