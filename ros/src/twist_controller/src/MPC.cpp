@@ -59,8 +59,8 @@ public:
         }
 
         for (size_t i = 0; i < N - 1; i++) {
-            fg[0] += 25000 * CppAD::pow(vars[delta_start + i], 2);
-            fg[0] += 1000 * CppAD::pow(vars[delta_start + i]*ref_v, 2);
+//            fg[0] += 25000 * CppAD::pow(vars[delta_start + i], 2);
+            fg[0] += 100 * CppAD::pow(vars[delta_start + i]*ref_v, 2);
             fg[0] += 10 * CppAD::pow(vars[a_start + i], 2);
         }
         for (size_t t = 0; t < N - 2; t++) {
