@@ -57,7 +57,6 @@ class DbwMpc
     styx_msgs::Lane waypoints;
     geometry_msgs::PoseStamped pose;
     geometry_msgs::TwistStamped velocity;
-    MPC mpc;
 
 public:
     DbwMpc() :
@@ -83,7 +82,7 @@ public:
         nhp.param<double>("wheel_base", wheel_base, 2.8498);
         double wheel_radius;
         nhp.param<double>("wheel_radius", wheel_radius, 0.2413);
-        nhp.param<double>("decel_limit", decel_limit, -5.);
+        nhp.param<double>("decel_limit", decel_limit, -1.);
         double accel_limit;
         nhp.param<double>("accel_limit", accel_limit, 1.);
         nhp.param<double>("brake_deadband", brake_deadband, .1);
@@ -111,7 +110,7 @@ public:
         while (ros::ok()) {
             ros::spinOnce();
             if (velocity_set && waypoint_set && pose_set) {
-                calculate(brake_deadband);
+                calculate(mpc);
 
                 if (enabled) {
                     dbw_mkz_msgs::SteeringCmd steerCmd;
@@ -119,26 +118,29 @@ public:
                     steerCmd.steering_wheel_angle_cmd = -steer_value * steer_ratio;
                     steering_publisher.publish(steerCmd);
 
+                    dbw_mkz_msgs::ThrottleCmd throttle_cmd;
+                    throttle_cmd.enable = true;
+                    throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
+                    dbw_mkz_msgs::BrakeCmd brake_cmd;
+                    brake_cmd.enable = true;
+                    brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_TORQUE;
+
                     if (throttle_value > 0) {
-                        dbw_mkz_msgs::ThrottleCmd throttle_cmd;
-                        throttle_cmd.enable = true;
-                        throttle_cmd.pedal_cmd_type = dbw_mkz_msgs::ThrottleCmd::CMD_PERCENT;
                         throttle_cmd.pedal_cmd = throttle_value / accel_limit;
-                        throttle_publisher.publish(throttle_cmd);
+                        brake_cmd.pedal_cmd = 0;
                     } else {
-                        dbw_mkz_msgs::BrakeCmd brake_cmd;
-                        brake_cmd.enable = true;
-                        brake_cmd.pedal_cmd_type = dbw_mkz_msgs::BrakeCmd::CMD_PERCENT;
+                        throttle_cmd.pedal_cmd = 0;
                         brake_cmd.pedal_cmd = throttle_value / decel_limit;
-                        brake_publisher.publish(brake_cmd);
                     }
+                    throttle_publisher.publish(throttle_cmd);
+                    brake_publisher.publish(brake_cmd);
                 }
             }
             loop_rate.sleep();
         }
     }
 
-    void calculate() {
+    void calculate(MPC& mpc) {
         vector<double> ptsx;
         vector<double> ptsy;
         size_t numWaypoints = waypoints.waypoints.size();
@@ -182,9 +184,9 @@ public:
 
         psi = 0;
         psi = steer_value;
-        // TODO predict for latency
         px = 0;
         py = 0;
+        // TODO predict for latency
 //        px = v * cos(psi) * latency;
 //        py = v * sin(psi) * latency;
 //        cte += v * sin(epsi) * latency;
@@ -203,7 +205,7 @@ public:
         if (target_speed < .1 && throttle_value < 0 && throttle_value > -brake_deadband) {
             throttle_value = -decel_limit;
         }
-        ROS_INFO_STREAM("steer=" << steer_value << " throttle=" << throttle_value);
+//        ROS_INFO_STREAM("steer=" << steer_value << " throttle=" << throttle_value);
     }
 
     void onEnabled(const std_msgs::BoolConstPtr isEnabled) {
