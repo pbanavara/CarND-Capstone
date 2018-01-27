@@ -54,16 +54,17 @@ public:
         // any anything you think may be beneficial.
         for (size_t i = 0; i < N; i++) {
             fg[0] += 10 * CppAD::pow(vars[cte_start + i], 2);
-            fg[0] += 10 * CppAD::pow(vars[epsi_start + i], 2);
+            fg[0] += 100 * CppAD::pow(vars[epsi_start + i], 2);
             fg[0] += 1 * CppAD::pow(vars[v_start + i] - ref_v, 2);
         }
 
         for (size_t i = 0; i < N - 1; i++) {
-            fg[0] += 5000 * CppAD::pow(vars[delta_start + i], 2);
+//            fg[0] += 25000 * CppAD::pow(vars[delta_start + i], 2);
+            fg[0] += 100 * CppAD::pow(vars[delta_start + i]*ref_v, 2);
             fg[0] += 10 * CppAD::pow(vars[a_start + i], 2);
         }
         for (size_t t = 0; t < N - 2; t++) {
-            fg[0] += 5000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
+            fg[0] += 25000 * CppAD::pow(vars[delta_start + t + 1] - vars[delta_start + t], 2);
             fg[0] += 10 * CppAD::pow(vars[a_start + t + 1] - vars[a_start + t], 2);
         }
 
