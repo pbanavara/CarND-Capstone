@@ -46,7 +46,7 @@ class WaypointUpdater(object):
         self.current_pose = None
         self.red_light_waypoint_idx = -1
 	self.callback_time = rospy.get_time()
-	self.initial_velocity = 5.0
+	self.initial_velocity = self.kmph2mps(rospy.get_param('~velocity')) 
 
         # Enter loop to process topic messages
         self.loop()

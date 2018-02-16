@@ -53,7 +53,7 @@ class FileSplitter:
 
         try:
             optlist, arglist = getopt.getopt(args, 'sji:n:', ["split=", "join="])
-        except getopt.GetoptError, e:
+        except getopt.GetoptError as e:
             print e
             return None
 
