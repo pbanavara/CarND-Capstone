@@ -9,7 +9,7 @@ from utils import label_map_util
 from utils import visualization_utils as vis_util
 from styx_msgs.msg import TrafficLight
 
-MODEL_TYPE = 1 # 1 for inception, 2 for resnet
+MODEL_TYPE = 2 # 1 for inception, 2 for resnet
 
 class TLClassifier(object):
     def __init__(self):
