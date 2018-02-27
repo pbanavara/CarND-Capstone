@@ -164,5 +164,9 @@ http://download.tensorflow.org/models/object_detection/faster_rcnn_resnet101_coc
 3. Train the model using the following command
 python object_detection/train.py --logtostderr --pipeline_config=model/faster_rcnn_resnet101_tl.config --train_dir=../../data
 
-Unfortunately the RESNET model didn't work for us and Tony's inception model seemed to be working fine. In the interest of time we are submitting with the working model. The RESNET model inference graph is located here https://s3.amazonaws.com/udacitycarndfinal/frozen_inference_graph.pb and the chunked files are also in the repository.
+After multiple iterations got the resnet model working on the rosbag data. Here are the prediction outputs for the Red and Yellow lights.
+
+![red_prediction](./writeup_imgs/resnet_red.png)
+![yello_prediction](./writeup_imgs/resnet_yellow.png)
+
 
